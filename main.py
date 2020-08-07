@@ -1,6 +1,7 @@
 import json
 import asyncio
 import aiohttp
+from contextlib import suppress
 from datetime import datetime
 from aiosseclient import aiosseclient
 from colorama import Fore, Back, Style
@@ -68,7 +69,5 @@ async def main():
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    try:
+    with suppress(KeyboardInterrupt):
         loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        pass
