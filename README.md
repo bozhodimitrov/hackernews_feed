@@ -1,5 +1,5 @@
 # HackerNews Realtime Feed
-Utilizes the HAckerNews Realtime Firebase (Server-Sent Events) in order to extract the latest topics.
+Utilizes the [Hacker News Realtime Firebase API](https://github.com/HackerNews/API) (Server-Sent Events) in order to extract the latest topics.
 
 ## Usage
 ```bash
