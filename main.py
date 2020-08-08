@@ -20,6 +20,7 @@ async def fetch_story(story_id):
     url = f'{ITEM_URL}/{story_id}.json'
     async with aiohttp.ClientSession() as session:
         for _ in range(10):
+            await asyncio.sleep(1)
             async with session.get(url, headers=HEADERS) as resp:
                 if resp.status != 200:
                     print(f'{resp.status} error')
@@ -29,7 +30,6 @@ async def fetch_story(story_id):
                 if result != None:
                     return result
 
-            await asyncio.sleep(1)
 
 
 def print_story(story):
