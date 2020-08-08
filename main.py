@@ -31,7 +31,6 @@ async def fetch_story(story_id):
                     return result
 
 
-
 def print_story(story):
     posted_at = datetime.fromtimestamp(int(story['time'])).strftime('%H:%M:%S')
     print(
