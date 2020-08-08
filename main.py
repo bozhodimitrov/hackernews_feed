@@ -45,26 +45,27 @@ def print_story(story):
 async def main():
     max_story_id = 0
     first_run = True
-    async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
-        stories = json.loads(event.data)
-        if stories == None:
-            continue
-
-        stories = stories.get('data', [])
-        for story_id in stories:
-            if story_id <= max_story_id or first_run:
-                continue
-            else:
-                max_story_id = story_id
-
-            story = await fetch_story(story_id)
-            if story == None:
-                print(f'{story_id}')
+    while True:
+        async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
+            stories = json.loads(event.data)
+            if stories == None:
                 continue
 
-            print_story(story)
+            stories = stories.get('data', [])
+            for story_id in stories:
+                if story_id <= max_story_id or first_run:
+                    continue
+                else:
+                    max_story_id = story_id
 
-        first_run = False
+                story = await fetch_story(story_id)
+                if story == None:
+                    print(f'{story_id}')
+                    continue
+
+                print_story(story)
+
+            first_run = False
 
 
 if __name__ == '__main__':
