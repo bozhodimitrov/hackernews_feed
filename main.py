@@ -7,6 +7,8 @@ from aiosseclient import aiosseclient
 from colorama import Fore, Back, Style
 
 
+FETCH_ATTEMPTS = 3
+FETCH_RETRY_DELAY = 5
 BASE_URL = 'https://hacker-news.firebaseio.com/v0'
 STORIES_URL = f'{BASE_URL}/newstories.json'
 ITEM_URL = f'{BASE_URL}/item'
@@ -14,13 +16,14 @@ HEADERS = { 'Accept': 'application/json' }
 SSE_TIMEOUT = aiohttp.ClientTimeout(
     total=None, connect=None, sock_connect=None, sock_read=None
 )
+INVALID_START = f'\n\n{Style.NORMAL}{Fore.RED}'
+INVALID_END = f'{Style.RESET_ALL}\n\n'
 
 
 async def fetch_story(story_id):
     url = f'{ITEM_URL}/{story_id}.json'
     async with aiohttp.ClientSession() as session:
-        for _ in range(10):
-            await asyncio.sleep(1)
+        for _ in range(FETCH_ATTEMPTS):
             async with session.get(url, headers=HEADERS) as resp:
                 if resp.status != 200:
                     print(f'{resp.status} error')
@@ -30,8 +33,13 @@ async def fetch_story(story_id):
                 if result != None:
                     return result
 
+            await asyncio.sleep(FETCH_RETRY_DELAY)
 
-def print_story(story):
+
+async def announce(story):
+    if not hasattr(announce, 'enable') or not announce.enable:
+        return
+
     posted_at = datetime.fromtimestamp(int(story['time'])).strftime('%H:%M:%S')
     print(
         f'{Style.BRIGHT}{Fore.BLUE}{posted_at} '
@@ -41,9 +49,8 @@ def print_story(story):
     )
 
 
-async def main():
+async def hackernews_feed():
     max_story_id = 0
-    first_run = True
     while True:
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
             stories = json.loads(event.data)
@@ -52,19 +59,22 @@ async def main():
 
             stories = stories.get('data', [])
             for story_id in stories:
-                if story_id <= max_story_id or first_run:
+                if story_id <= max_story_id:
                     continue
-                else:
-                    max_story_id = story_id
 
+                max_story_id = story_id
                 story = await fetch_story(story_id)
                 if story == None:
-                    print(f'{story_id}')
-                    continue
+                    print(f'{INVALID_START}{story_id}{INVALID_END}')
+                else:
+                    yield story
+            else:
+                announce.enable = True
 
-                print_story(story)
 
-            first_run = False
+async def main():
+    async for story in hackernews_feed():
+        await announce(story)
 
 
 if __name__ == '__main__':
