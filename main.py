@@ -43,7 +43,7 @@ async def announce(story):
     posted_at = datetime.fromtimestamp(int(story['time'])).strftime('%H:%M:%S')
     print(
         f'{Style.BRIGHT}{Fore.BLUE}{posted_at} '
-        f'{Style.NORMAL}{Fore.CYAN}{story["title"]} '
+        f'{Style.NORMAL}{Fore.CYAN}{story.get("title", "-")} '
         f'{Style.BRIGHT}{Fore.GREEN}{story["id"]}\n'
         f'{Style.RESET_ALL}{story.get("url", "-")}'
     )
