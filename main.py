@@ -24,15 +24,16 @@ async def fetch_story(story_id):
     url = f'{ITEM_URL}/{story_id}.json'
     async with aiohttp.ClientSession() as session:
         for _ in range(FETCH_ATTEMPTS):
-            async with session.get(url, headers=HEADERS) as resp:
-                if resp.status != 200:
-                    print(f'{resp.status} error')
-                    return
+            with suppress(aiohttp.client_exceptions.ClientConnectorError):
+                async with session.get(url, headers=HEADERS) as resp:
+                        if resp.status != 200:
+                            print(f'{resp.status} error')
+                            return
 
-                result = await resp.json()
-                if result != None:
-                    return result
-
+                        result = await resp.json()
+                        if result != None:
+                            return result
+                
             await asyncio.sleep(FETCH_RETRY_DELAY)
 
 
