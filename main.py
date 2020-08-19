@@ -33,10 +33,12 @@ def retry(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
         for _ in range(FETCH_ATTEMPTS):
-            if result := await func(*args, **kwargs):
-                break
-            else:
+            result = await func(*args, **kwargs)
+            if not result:
                 await asyncio.sleep(FETCH_RETRY_DELAY)
+            else:
+                break
+ 
         return result
 
     return wrapper
@@ -60,7 +62,8 @@ async def web_fetch(story_id, timestamp):
             async with session.get(url, headers=HEADERS) as resp:
                 if resp.status == 200:
                     html = await resp.text()
-                    if match := ITEM_PATTERN.search(html):
+                    match = ITEM_PATTERN.search(html)
+                    if match:
                         return {
                             'id': story_id,
                             'url': match.group('url'),
@@ -70,9 +73,12 @@ async def web_fetch(story_id, timestamp):
 
 
 async def fetch(story_id, timestamp):
-    if story := await api_fetch(story_id):
+    story = await api_fetch(story_id)
+    if story:
         return story
-    elif story := await web_fetch(story_id, timestamp):
+
+    story = await web_fetch(story_id, timestamp)
+    if story:
         return story
     else:
         print(f'{INVALID_START}{story_id}{INVALID_END}')
@@ -105,7 +111,8 @@ async def hackernews_feed():
                     continue
 
                 max_story_id = story_id
-                if story := await fetch(story_id, time.time()):
+                story = await fetch(story_id, time.time())
+                if story:
                     yield story
             else:
                 announce.enable = True
