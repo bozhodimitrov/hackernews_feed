@@ -7,11 +7,12 @@ from contextlib import suppress
 from functools import wraps
 from datetime import datetime
 from aiosseclient import aiosseclient
+from cachetools import LRUCache
 from colorama import Fore, Back, Style
 
 
 FETCH_ATTEMPTS = 3
-FETCH_RETRY_DELAY = 5
+FETCH_RETRY_DELAY = 3
 
 BASE_URL = 'https://hacker-news.firebaseio.com/v0'
 STORIES_URL = f'{BASE_URL}/newstories.json'
@@ -98,7 +99,8 @@ async def announce(story):
 
 
 async def hackernews_feed():
-    max_story_id = 0
+    cache = LRUCache(512)
+
     while True:
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
             stories = json.loads(event.data)
@@ -107,8 +109,10 @@ async def hackernews_feed():
 
             stories = stories.get('data', [])
             for story_id in stories:
-                if story_id <= max_story_id:
+                if story_id in cache:
                     continue
+                else:
+                    cache[story_id] = None
 
                 max_story_id = story_id
                 story = await fetch(story_id, time.time())
