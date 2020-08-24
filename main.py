@@ -107,7 +107,7 @@ async def hackernews_feed():
             if stories == None:
                 continue
 
-            stories = stories.get('data', [])[::1]
+            stories = stories.get('data', []).sort()
             for story_id in stories:
                 if story_id in cache:
                     continue
