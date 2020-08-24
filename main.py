@@ -74,6 +74,9 @@ async def web_fetch(story_id, timestamp):
 
 
 async def fetch(story_id, timestamp):
+    if not hasattr(fetch, 'enable') or not fetch.enable:
+        return
+
     story = await api_fetch(story_id)
     if story:
         return story
@@ -86,9 +89,6 @@ async def fetch(story_id, timestamp):
 
 
 async def announce(story):
-    if not hasattr(announce, 'enable') or not announce.enable:
-        return
-
     posted_at = datetime.fromtimestamp(int(story['time'])).strftime('%H:%M:%S')
     print(
         f'{Style.BRIGHT}{Fore.BLUE}{posted_at} '
@@ -99,7 +99,7 @@ async def announce(story):
 
 
 async def hackernews_feed():
-    cache = LRUCache(512)
+    cache = LRUCache(1024)
 
     while True:
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
@@ -107,7 +107,7 @@ async def hackernews_feed():
             if stories == None:
                 continue
 
-            stories = stories.get('data', [])
+            stories = stories.get('data', [])[::1]
             for story_id in stories:
                 if story_id in cache:
                     continue
@@ -119,7 +119,7 @@ async def hackernews_feed():
                 if story:
                     yield story
             else:
-                announce.enable = True
+                fetch.enable = True
 
 
 async def main():
