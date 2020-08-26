@@ -3,7 +3,7 @@ import aiohttp
 import json
 import re
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from functools import wraps
 from datetime import datetime
 from aiosseclient import aiosseclient
@@ -18,8 +18,8 @@ BASE_URL = 'https://hacker-news.firebaseio.com/v0'
 STORIES_URL = f'{BASE_URL}/newstories.json'
 ITEM_URL = f'{BASE_URL}/item'
 WEB_ITEM_URL = f'https://news.ycombinator.com/item?id='
-INVALID_START = f'\n\n{Style.NORMAL}{Fore.RED}'
-INVALID_END = f'{Style.RESET_ALL}\n\n'
+INVALID_MSG_START = f'\n\n{Style.NORMAL}{Fore.RED}'
+INVALID_MSG_END = f'{Style.RESET_ALL}\n\n'
 ITEM_PATTERN = re.compile(
     r'"title"><a href="(?P<url>.*?)".*?>(?P<title>.*?)</a>'
 )
@@ -73,19 +73,23 @@ async def web_fetch(story_id, timestamp):
                         }
 
 
-async def fetch(story_id, timestamp):
-    if not hasattr(fetch, 'enable') or not fetch.enable:
-        return
+@contextmanager
+def fetcher():
+    async def fetch(story_id, timestamp):
+        if not hasattr(fetch, 'enable') or not fetch.enable:
+            return
 
-    story = await api_fetch(story_id)
-    if story:
-        return story
+        story = await api_fetch(story_id)
+        if story:
+            return story
 
-    story = await web_fetch(story_id, timestamp)
-    if story:
-        return story
-    else:
-        print(f'{INVALID_START}{story_id}{INVALID_END}')
+        story = await web_fetch(story_id, timestamp)
+        if story:
+            return story
+        else:
+            print(f'{INVALID_MSG_START}{story_id}{INVALID_MSG_END}')
+
+    yield fetch
 
 
 async def announce(story):
@@ -98,35 +102,37 @@ async def announce(story):
     )
 
 
+def load_stories(event_data):
+    stories = json.loads(event_data)
+    if not stories:
+        return
+    else:
+        stories = stories.get('data', [])
+        stories.sort()
+        for story_id in stories:
+            yield story_id
+
+
 async def hackernews_feed():
     cache = LRUCache(1024)
-
-    while True:
+    with fetcher() as fetch:
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
-            stories = json.loads(event.data)
-            if stories == None:
-                continue
-
-            stories = stories.get('data', [])
-            stories.sort()
-
-            for story_id in stories:
+            for story_id in load_stories(even.data):
                 if story_id in cache:
                     continue
                 else:
                     cache[story_id] = None
-
-                max_story_id = story_id
-                story = await fetch(story_id, time.time())
-                if story:
-                    yield story
+                    story = await fetch(story_id, time.time())
+                    if story:
+                        yield story
             else:
                 fetch.enable = True
 
 
 async def main():
-    async for story in hackernews_feed():
-        await announce(story)
+    while True:
+        async for story in hackernews_feed():
+            await announce(story)
 
 
 if __name__ == '__main__':
