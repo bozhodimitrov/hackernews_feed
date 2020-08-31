@@ -1,14 +1,17 @@
 import asyncio
-import aiohttp
 import json
 import re
 import time
-from contextlib import contextmanager, suppress
-from functools import wraps
+from contextlib import contextmanager
+from contextlib import suppress
 from datetime import datetime
+from functools import wraps
+
+import aiohttp
 from aiosseclient import aiosseclient
 from cachetools import LRUCache
-from colorama import Fore, Back, Style
+from colorama import Fore
+from colorama import Style
 
 
 FETCH_ATTEMPTS = 3
@@ -17,16 +20,16 @@ FETCH_RETRY_DELAY = 3
 BASE_URL = 'https://hacker-news.firebaseio.com/v0'
 STORIES_URL = f'{BASE_URL}/newstories.json'
 ITEM_URL = f'{BASE_URL}/item'
-WEB_ITEM_URL = f'https://news.ycombinator.com/item?id='
+WEB_ITEM_URL = 'https://news.ycombinator.com/item?id='
 INVALID_MSG_START = f'\n\n{Style.NORMAL}{Fore.RED}'
 INVALID_MSG_END = f'{Style.RESET_ALL}\n\n'
 ITEM_PATTERN = re.compile(
-    r'"title"><a href="(?P<url>.*?)".*?>(?P<title>.*?)</a>'
+    r'"title"><a href="(?P<url>.*?)".*?>(?P<title>.*?)</a>',
 )
 
-HEADERS = { 'Accept': 'application/json' }
+HEADERS = {'Accept': 'application/json'}
 SSE_TIMEOUT = aiohttp.ClientTimeout(
-    total=None, connect=None, sock_connect=None, sock_read=None
+    total=None, connect=None, sock_connect=None, sock_read=None,
 )
 
 
@@ -39,7 +42,7 @@ def retry(func):
                 await asyncio.sleep(FETCH_RETRY_DELAY)
             else:
                 break
- 
+
         return result
 
     return wrapper
@@ -98,7 +101,7 @@ async def announce(story):
         f'{Style.BRIGHT}{Fore.BLUE}{posted_at} '
         f'{Style.NORMAL}{Fore.CYAN}{story.get("title", "-")} '
         f'{Style.BRIGHT}{Fore.GREEN}{story["id"]}\n'
-        f'{Style.RESET_ALL}{story.get("url", "-")}'
+        f'{Style.RESET_ALL}{story.get("url", "-")}',
     )
 
 
@@ -109,8 +112,7 @@ def load_stories(event_data):
     else:
         stories = stories.get('data', [])
         stories.sort()
-        for story_id in stories:
-            yield story_id
+        yield from stories
 
 
 async def hackernews_feed():
