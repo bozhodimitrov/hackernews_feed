@@ -118,6 +118,7 @@ def load_stories(event_data):
 async def hackernews_feed():
     cache = LRUCache(1024)
     with fetcher() as fetch:
+        # TODO: implement detection for network issues/disconnections
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
             for story_id in load_stories(event.data):
                 if story_id in cache:
