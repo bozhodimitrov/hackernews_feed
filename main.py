@@ -3,7 +3,6 @@ import json
 import re
 import time
 from contextlib import contextmanager
-from contextlib import suppress
 from datetime import datetime
 from functools import wraps
 
