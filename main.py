@@ -3,6 +3,7 @@ import json
 import re
 import time
 from contextlib import contextmanager
+from contextlib import suppress
 from datetime import datetime
 from functools import wraps
 
@@ -27,9 +28,7 @@ ITEM_PATTERN = re.compile(
 )
 
 HEADERS = {'Accept': 'application/json'}
-SSE_TIMEOUT = aiohttp.ClientTimeout(
-    total=None, connect=None, sock_connect=None, sock_read=None,
-)
+SSE_TIMEOUT = aiohttp.ClientTimeout()
 
 
 def retry(func):
@@ -117,8 +116,7 @@ def load_stories(event_data):
 async def hackernews_feed():
     cache = LRUCache(1024)
     with fetcher() as fetch:
-        # TODO: fix Timeout
-        async for event in aiosseclient(STORIES_URL):
+        async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
             for story_id in load_stories(event.data):
                 if story_id in cache:
                     continue
@@ -136,8 +134,11 @@ async def main():
         try:
             async for story in hackernews_feed():
                 await announce(story)
-        except (asyncio.TimeoutError, aiohttp.client_exceptions.ClientConnectorError):
-            print('Retrying ...')
+        except (
+                asyncio.TimeoutError,
+                aiohttp.client_exceptions.ClientConnectorError,
+        ):
+            print(f'{time.strftime("%X")} Retrying ...')
             await asyncio.sleep(FETCH_RETRY_DELAY)
 
 
