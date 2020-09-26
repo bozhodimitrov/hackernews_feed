@@ -28,7 +28,13 @@ ITEM_PATTERN = re.compile(
 )
 
 HEADERS = {'Accept': 'application/json'}
-SSE_TIMEOUT = aiohttp.ClientTimeout()
+FIREBASE_TIMEOUT = 30 + 5
+SSE_TIMEOUT = aiohttp.ClientTimeout(
+    total=None,
+    connect=FIREBASE_TIMEOUT,
+    sock_connect=FIREBASE_TIMEOUT,
+    sock_read=FIREBASE_TIMEOUT,
+)
 
 
 def retry(func):
@@ -139,7 +145,7 @@ async def main():
                 aiohttp.client_exceptions.ClientConnectorError,
         ):
             print(f'{time.strftime("%X")} Retrying ...')
-            await asyncio.sleep(FETCH_RETRY_DELAY)
+            await asyncio.sleep(FIREBASE_TIMEOUT)
 
 
 if __name__ == '__main__':
