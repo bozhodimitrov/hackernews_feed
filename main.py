@@ -117,8 +117,8 @@ def load_stories(event_data):
 async def hackernews_feed():
     cache = LRUCache(1024)
     with fetcher() as fetch:
-        # TODO: implement detection for network issues/disconnections
-        async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
+        # TODO: fix Timeout
+        async for event in aiosseclient(STORIES_URL):
             for story_id in load_stories(event.data):
                 if story_id in cache:
                     continue
@@ -133,8 +133,12 @@ async def hackernews_feed():
 
 async def main():
     while True:
-        async for story in hackernews_feed():
-            await announce(story)
+        try:
+            async for story in hackernews_feed():
+                await announce(story)
+        except (asyncio.TimeoutError, aiohttp.client_exceptions.ClientConnectorError):
+            print('Retrying ...')
+            await asyncio.sleep(FETCH_RETRY_DELAY)
 
 
 if __name__ == '__main__':
