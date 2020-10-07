@@ -38,7 +38,7 @@ SSE_TIMEOUT = aiohttp.ClientTimeout(
 
 
 class LRU(OrderedDict):
-    def __init__(self, maxsize=128, /, *args, **kwds):
+    def __init__(self, maxsize=128, *args, **kwds):
         self.maxsize = maxsize
         super().__init__(*args, **kwds)
 
