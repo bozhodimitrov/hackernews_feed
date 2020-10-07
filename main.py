@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import time
+from collections import OrderedDict
 from contextlib import contextmanager
 from contextlib import suppress
 from datetime import datetime
@@ -9,7 +10,6 @@ from functools import wraps
 
 import aiohttp
 from aiosseclient import aiosseclient
-from cachetools import LRUCache
 from colorama import Fore
 from colorama import Style
 
@@ -35,6 +35,33 @@ SSE_TIMEOUT = aiohttp.ClientTimeout(
     sock_connect=FIREBASE_TIMEOUT,
     sock_read=FIREBASE_TIMEOUT,
 )
+
+
+class LRU(OrderedDict):
+    def __init__(self, maxsize=128, /, *args, **kwds):
+        self.maxsize = maxsize
+        super().__init__(*args, **kwds)
+
+    def __contains__(self, key):
+        found = super().__contains__(key)
+        if found:
+            self.move_to_end(key)
+        else:
+            self[key] = None
+        return found
+
+    def __getitem__(self, key):
+        self.move_to_end(key)
+        return super().__getitem__(key)
+
+    def __setitem__(self, key, value):
+        if super().__contains__(key):
+            self.move_to_end(key)
+        else:
+            super().__setitem__(key, value)
+        if len(self) > self.maxsize:
+            oldest = next(iter(self))
+            del self[oldest]
 
 
 def retry(func):
@@ -120,14 +147,13 @@ def load_stories(event_data):
 
 
 async def hackernews_feed():
-    cache = LRUCache(1024)
+    cache = LRU(1024)
     with fetcher() as fetch:
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
             for story_id in load_stories(event.data):
                 if story_id in cache:
                     continue
                 else:
-                    cache[story_id] = None
                     story = await fetch(story_id, time.time())
                     if story:
                         yield story
