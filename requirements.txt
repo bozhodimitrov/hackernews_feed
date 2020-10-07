@@ -1,3 +1,2 @@
-cachetools==4.1.1
 colorama==0.4.3
 git+https://github.com/ebraminio/aiosseclient@4d743c046919f4c9ab74ffea201515155ad26a63
