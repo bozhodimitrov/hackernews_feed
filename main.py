@@ -21,8 +21,7 @@ BASE_URL = 'https://hacker-news.firebaseio.com/v0'
 STORIES_URL = f'{BASE_URL}/newstories.json'
 ITEM_URL = f'{BASE_URL}/item'
 WEB_ITEM_URL = 'https://news.ycombinator.com/item?id='
-INVALID_MSG_START = f'\n\n{Style.NORMAL}{Fore.RED}'
-INVALID_MSG_END = f'{Style.RESET_ALL}\n\n'
+INVALID_MSG = f'\n\n{Style.NORMAL}{Fore.RED}{{}}{Style.RESET_ALL}\n\n'
 ITEM_PATTERN = re.compile(
     r'"title"><a href="(?P<url>.*?)".*?>(?P<title>.*?)</a>',
 )
@@ -110,7 +109,7 @@ async def web_fetch(story_id, timestamp):
 @contextmanager
 def fetcher():
     async def fetch(story_id, timestamp):
-        if not hasattr(fetch, 'enable') or not fetch.enable:
+        if not getattr(fetch, 'enable', False):
             return
 
         story = await api_fetch(story_id)
@@ -121,7 +120,7 @@ def fetcher():
         if story:
             return story
         else:
-            print(f'{INVALID_MSG_START}{story_id}{INVALID_MSG_END}')
+            print(INVALID_MSG.format(story_id))
 
     yield fetch
 
