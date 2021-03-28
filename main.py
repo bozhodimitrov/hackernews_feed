@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from contextlib import suppress
 from datetime import datetime
 from functools import wraps
+from types import SimpleNamespace as Story
 
 import aiohttp
 from aiosseclient import aiosseclient
@@ -21,7 +22,6 @@ BASE_URL = 'https://hacker-news.firebaseio.com/v0'
 STORIES_URL = f'{BASE_URL}/newstories.json'
 ITEM_URL = f'{BASE_URL}/item'
 WEB_ITEM_URL = 'https://news.ycombinator.com/item?id='
-INVALID_MSG = f'\n\n{Style.NORMAL}{Fore.RED}{{}}{Style.RESET_ALL}\n\n'
 ITEM_PATTERN = re.compile(
     r'"title"><a href="(?P<url>.*?)".*?>(?P<title>.*?)</a>',
 )
@@ -33,6 +33,14 @@ SSE_TIMEOUT = aiohttp.ClientTimeout(
     connect=FIREBASE_TIMEOUT,
     sock_connect=FIREBASE_TIMEOUT,
     sock_read=FIREBASE_TIMEOUT,
+)
+
+INVALID_MSG = f'\n\n{Style.NORMAL}{Fore.RED}{{}}{Style.RESET_ALL}\n\n'
+RETRYING_MSG = f'{Fore.RED}Retrying...{Style.RESET_ALL}'
+
+ERRORS = (
+    asyncio.TimeoutError,
+    aiohttp.client_exceptions.ClientConnectorError,
 )
 
 
@@ -85,7 +93,9 @@ async def api_fetch(story_id):
         with suppress(aiohttp.client_exceptions.ClientConnectorError):
             async with session.get(url, headers=HEADERS) as resp:
                 if resp.status == 200:
-                    return await resp.json()
+                    result = await resp.json()
+                    if result:
+                        return Story(**result)
 
 
 @retry
@@ -98,12 +108,12 @@ async def web_fetch(story_id, timestamp):
                     html = await resp.text()
                     match = ITEM_PATTERN.search(html)
                     if match:
-                        return {
-                            'id': story_id,
-                            'url': match.group('url'),
-                            'title': match.group('title'),
-                            'time': timestamp,
-                        }
+                        return Story(
+                            id=story_id,
+                            url=match.group('url'),
+                            title=match.group('title'),
+                            time=timestamp,
+                        )
 
 
 @contextmanager
@@ -126,12 +136,12 @@ def fetcher():
 
 
 async def announce(story):
-    posted_at = datetime.fromtimestamp(int(story['time'])).strftime('%H:%M:%S')
+    posted_at = datetime.fromtimestamp(int(story.time)).strftime('%H:%M:%S')
     print(
         f'{Style.BRIGHT}{Fore.BLUE}{posted_at} '
-        f'{Style.NORMAL}{Fore.CYAN}{story.get("title", "-")} '
-        f'{Style.BRIGHT}{Fore.GREEN}{story["id"]}\n'
-        f'{Style.RESET_ALL}{story.get("url", "-")}',
+        f'{Style.NORMAL}{Fore.CYAN}{getattr(story, "title", "-")} '
+        f'{Style.BRIGHT}{Fore.GREEN}{story.id}\n'
+        f'{Style.RESET_ALL}{getattr(story, "url", "-")}',
     )
 
 
@@ -146,13 +156,11 @@ def load_stories(event_data):
 
 
 async def hackernews_feed():
-    cache = LRU(1024)
+    seen = LRU(1024)
     with fetcher() as fetch:
         async for event in aiosseclient(STORIES_URL, timeout=SSE_TIMEOUT):
             for story_id in load_stories(event.data):
-                if story_id in cache:
-                    continue
-                else:
+                if story_id not in seen:
                     story = await fetch(story_id, time.time())
                     if story:
                         yield story
@@ -165,17 +173,13 @@ async def main():
         try:
             async for story in hackernews_feed():
                 await announce(story)
-        except (
-                asyncio.TimeoutError,
-                aiohttp.client_exceptions.ClientConnectorError,
-        ):
-            print(f'{time.strftime("%X")} Retrying ...')
+        except ERRORS:
+            print(f'{time.strftime("%X")} {RETRYING_MSG}')
             await asyncio.sleep(FIREBASE_TIMEOUT)
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(main())
+        asyncio.run(main())
     except KeyboardInterrupt:
         raise SystemExit(130)
